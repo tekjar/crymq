@@ -1,101 +1,36 @@
-enum QoS: UInt8
-    AtmostOnce = 0
-    AtleastOnce
-    ExactlyOnce
-end
+## Fixed header for each MQTT control packet
+##
+## Format:
+##
+## ```plain
+## 7                          3                          0
+## +--------------------------+--------------------------+
+## | MQTT Control Packet Type | Flags for each type      |
+## +--------------------------+--------------------------+
+## |                  Remaining Length                   |
+## +-----------------------------------------------------+
+## ```
 
-struct Pkid
-    @pkid : UInt16
-
-    def initialize(@pkid)
-    end
-
-    def reset
-        @pkid = 0
-    end
-
-    def next
-        @pkid += 1
-    end
-end
-
-
-struct Connect
-    @protocol : UInt8
-    @keep_alive : UInt16
-    @client_id : String
-    @last_will : UInt8
-    @username : String
-    @password : String
-
-    def initialize(@client_id, @keep_alive)
-        @protocol = 4_u8
-        @last_will = 0_u8
-        @username = ""
-        @password = ""
-    end
-end
-
-struct Connack
-    @session_present : Bool
-    @return_code : UInt8
-
+abstract struct Control
     def initialize
-        @session_present = false
-        @return_code = 0_u8
-    end
-end
-
-struct Publish
-    @qos: QoS
-    @dup: Bool
-    @retain: Bool
-    @topic: String
-    @pkid: Pkid
-    @payload: Bytes
-
-    def initialize(@topic, @qos, @payload)
-        @dup = false
-        @retain = false
-        @pkid = Pkid.new(0_u16)
     end
 
-end
+    def write_remaining_length(io : IO, remaining_len)
+      loop do
+        digit = (remaining_len % 128).to_u8
+        remaining_len /= 128
+        if remaining_len > 0
+          digit |= 0x80_u8
+        end
+        io.write_byte(digit)
+        if remaining_len == 0
+          break
+        end
+      end
+    end
 
-struct Subscribe
-    @topic: String
-    @qos: QoS
-    @pkid: Pkid
-
-    def initialize(@topic, @qos)
-        @pkid = Pkid.new(0_u16)
+    def write_mqtt_string(io : IO, s : String)
+      io.write_bytes(s.bytesize.to_u16, IO::ByteFormat::NetworkEndian)
+      s.each_byte { |x| io.write_byte(x) }
     end
 end
-
-struct Suback
-    @pkid : Pkid
-    @return_code : UInt8
-
-    def initialize
-        @pkid = 0_u8
-        @return_code = 0_u8
-    end
-end
-
-struct Unsubscribe
-    @topic: String
-    @pkid: Pkid
-
-    def initialize(@topic)
-        @pkid = Pkid.new(0_u16)
-    end
-end
-
-connect = Connect.new("hello", 10_u16)
-puts connect
-
-connack = Connack.new
-puts connack
-
-publish = Publish.new("a/b/c", QoS::AtleastOnce, "hello world".to_slice)
-puts publish
