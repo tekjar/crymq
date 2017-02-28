@@ -112,7 +112,6 @@ struct Connect < Control
     @password : String
     @clean_session: Bool
 
-    #TODO: Generate random client id
     def initialize(@client_id = "", @keep_alive = 30_u16, @clean_session = true, @username = "", @password = "")
     end
 
@@ -359,20 +358,24 @@ end
 ##
 ##     ... for all the topics
 ##
-struct Subscribe
-    #TODO
-    @topic: String
-    @qos: QoS
+struct Subscribe < Control
+    @topics: Array({String, QoS})
     @pkid: Pkid
 
-    def initialize(@topic, @qos)
-        @pkid = Pkid.new(0_u16)
+    def initialize(@topics, @pkid)
     end
 
     def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
-      remaining_len = 2 + @return_codes.size
+      remaining_len = 2 + @topics.map { |s| s[0].size + 3 }.sum
       io.write_byte(0x82_u8)
       io.write_byte(remaining_len.to_u8)
+      io.write_byte((@pkid.value >> 8).to_u8)
+      io.write_byte(@pkid.value.to_u8)
+
+      @topics.each do |s|
+        write_mqtt_string(io, s[0])
+        io.write_byte(s[1].to_u8)
+      end
     end
 end
 
