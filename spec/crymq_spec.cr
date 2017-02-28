@@ -19,4 +19,16 @@ describe Crymq do
     socket.write_bytes(connack, IO::ByteFormat::NetworkEndian)
     socket.to_slice.hexstring.should eq("321a000b68656c6c6f2f776f726c64006468656c6c6f20776f726c64")
   end
+  it "puback packet write works" do
+    socket = IO::Memory.new
+    connack = Puback.new(Pkid.new(1000_u16))
+    socket.write_bytes(connack, IO::ByteFormat::NetworkEndian)
+    socket.to_slice.hexstring.should eq("400203e8")
+  end
+  it "suback packet write works" do
+    socket = IO::Memory.new
+    connack = Suback.new(Pkid.new(100_u16), [1_u8, 2_u8, 3_u8, 128_u8])
+    socket.write_bytes(connack, IO::ByteFormat::NetworkEndian)
+    socket.to_slice.hexstring.should eq("9006006401020380")
+  end
 end

@@ -334,7 +334,33 @@ struct Pubcomp
     end
 end
 
+## Fixed header for SUBSCRIBE PACKET
+##
+## 7                          3                          0
+## +--------------------------+--------------------------+
+## |   SUBSCRIBE (8) NIBBLE   |     RESERVED             |   0
+## +--------------------------+--------------------------+
+## | Remaining Len = Len of Variable header(2) + Payload |   1
+## +-----------------------------------------------------+
+## 
+##
+## Variable header ( LENGTH = 2 Bytes)
+##
+## +--------------------------+--------------------------+
+## |                 Packet Identifier MSB               |   2
+## +-----------------------------------------------------+
+## +--------------------------+--------------------------+
+## |                 Packet Identifier LSB               |   3
+## +-----------------------------------------------------+
+##
+## Payload: Set these optionals
+##
+##     2 bytes subscribe topic length + subscribe topic + 1 byte qos
+##
+##     ... for all the topics
+##
 struct Subscribe
+    #TODO
     @topic: String
     @qos: QoS
     @pkid: Pkid
@@ -342,14 +368,20 @@ struct Subscribe
     def initialize(@topic, @qos)
         @pkid = Pkid.new(0_u16)
     end
+
+    def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
+      remaining_len = 2 + @return_codes.size
+      io.write_byte(0x82_u8)
+      io.write_byte(remaining_len.to_u8)
+    end
 end
 
 
-## Fixed header for PUBLISH PACKET
+## Fixed header for SUBACK PACKET
 ##
 ## 7                          3                          0
 ## +--------------------------+--------------------------+
-## |     PUBLISH (3) NIBBLE   | DUP(1), QoS(2), Retain(1)|   0
+## |     PUBLISH (9) NIBBLE   | DUP(1), QoS(2), Retain(1)|   0
 ## +--------------------------+--------------------------+
 ## | Remaining Len = Len of Variable header(10) + Payload|   1
 ## +-----------------------------------------------------+
@@ -361,7 +393,7 @@ end
 ## |                  Packet Identifier MSB              |   2
 ## +-----------------------------------------------------+
 ## +--------------------------+--------------------------+
-## |                  Packet Identifier MSB              |   3
+## |                  Packet Identifier LSB              |   3
 ## +-----------------------------------------------------+
 ##
 ##
@@ -386,11 +418,16 @@ struct Suback
     end
 
     def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
-      remaining_len = 2 + @return_code.len
-      io.write_byte(0x90)
-      write_mqtt_string(io, remaining_len)
+      remaining_len = 2 + @return_codes.size
+      io.write_byte(0x90_u8)
+      io.write_byte(remaining_len.to_u8)
 
-      # TODO: Finish this
+      io.write_byte((@pkid.value >> 8).to_u8)
+      io.write_byte(@pkid.value.to_u8)
+      
+      @return_codes.each do |r|
+        io.write_byte(r)
+      end
     end
 end
 
@@ -410,10 +447,40 @@ struct Unsuback
     end
 
     def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
-      frame = UInt8.slice(0x40, 0x02)
+      frame = UInt8.slice(0xB0, 0x02)
       io.write(frame)
       io.write_byte((@pkid.value >> 8).to_u8)
       io.write_byte(@pkid.value.to_u8)
+    end
+end
+
+struct Pingreq
+    def initialize
+    end
+
+    def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
+      frame = UInt8.slice(0xC0, 0x00)
+      io.write(frame)
+    end
+end
+
+struct Pingresp
+    def initialize
+    end
+
+    def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
+      frame = UInt8.slice(0xD0, 0x00)
+      io.write(frame)
+    end
+end
+
+struct Disconnect
+    def initialize
+    end
+
+    def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
+      frame = UInt8.slice(0xE0, 0x00)
+      io.write(frame)
     end
 end
 
