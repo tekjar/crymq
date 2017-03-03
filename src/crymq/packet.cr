@@ -1,26 +1,7 @@
 require "./mqtt"
 
-enum PacketType : UInt8
-    Connect     = 1
-    Connack
-    Publish
-    Puback
-    Pubrec
-    Pubrel
-    Pubcomp
-    Subscribe
-    Suback
-    Unsubscribe
-    Unsuback
-    Pingreq
-    Pingresp
-    Disconnect
-  end
-
-  PROTO_NAME  = {0x00_u8, 0x04_u8, 0x4D_u8, 0x51_u8, 0x54_u8, 0x54_u8} #04MQTT
-  PROTO_LEVEL = 4_u8
-
-  alias Packet = Connect | Connack | Publish | Puback | Pubrec | Pubrel | Pubcomp | Suback | Suback | Unsubscribe | Unsuback
+PROTO_NAME  = {0x00_u8, 0x04_u8, 0x4D_u8, 0x51_u8, 0x54_u8, 0x54_u8} #04MQTT
+PROTO_LEVEL = 4_u8
 
 enum QoS: UInt8
     AtmostOnce = 0
@@ -492,3 +473,60 @@ end
 
 # publish = Publish.new("a/b/c", QoS::AtleastOnce, "hello world".to_slice)
 # puts publish
+
+alias Packet = Connect | Connack | Publish | Puback | Pubrec | Pubrel | Pubcomp | Suback | Suback | Unsubscribe | Unsuback
+
+struct Mqtt
+  def initialize
+  end
+
+  def self.read_remaining_length(io : IO)
+      remaining_length = 0_u32
+      multiplier = 0_u32
+      loop do
+        if digit = io.read_byte
+          remaining_length |= (digit & 127) << multiplier
+          if (digit & 128) == 0
+            return remaining_length.to_i
+          end
+          multiplier += 7
+        end
+      end
+    end
+
+  def self.from_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
+    if pkt_type = io.read_byte
+      remaining_len = self.read_remaining_length(io)
+      case pkt_type >> 4
+      when 1
+        puts "connect packet"
+      when 2
+        puts "connack packet"
+      when 3
+        puts "publish packet"
+      when 4
+        puts "puback packet"
+      when 5
+        puts "pubrec packet"
+      when 6
+        puts "pubrel packet"
+      when 7
+        puts "pubcomp packet"
+      when 8
+        puts "subscribe packet"
+      when 9
+        puts "suback packet"
+      when 10
+        puts "unsubscribe packet"
+      when 11
+        puts "unsuback packet"
+      when 12
+        puts "pingreq packet"
+      when 13
+        puts "pingresp packet"
+      when 14
+        puts "disconnect packet"
+      end
+    end
+  end
+end
