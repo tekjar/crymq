@@ -183,7 +183,7 @@ end
 ## +--------------------------+--------------------------+
 ## |     PUBLISH (3) NIBBLE   | DUP(1), QoS(2), Retain(1)|   0
 ## +--------------------------+--------------------------+
-## | Remaining Len = Len of Variable header(10) + Payload|   1
+## |    Remaining Len = Len of Variable header + Payload |   1
 ## +-----------------------------------------------------+
 ## 
 ##
@@ -492,26 +492,84 @@ struct Mqtt
           multiplier += 7
         end
       end
-    end
+  end
+
+  def self.read_mqtt_string(io : IO)
+    len = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+    data = Bytes.new(len)
+    io.read_fully(data)
+    String.new(data)
+  end
 
   def self.from_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
-    if pkt_type = io.read_byte
-      remaining_len = self.read_remaining_length(io)
+      header = io.read_byte.not_nil!
+      remaining_len = read_remaining_length(io)
+      
+      pkt_type = header >> 4
+      hflags = header & 0x0F
+      #TODO: Replace `not_nil` with custom exception
+      #TODO: Split to smaller methods
       case pkt_type >> 4
       when 1
-        puts "connect packet"
+        protocol = read_mqtt_string(io)    
+        level = io.read_byte.not_nil!      
+        connect_flags = io.read_byte.not_nil!
+        keep_alive = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)   
+        client_id = read_mqtt_string(io)
+        clean_session = (connect_flags & 0b10 != 0)? true : false
+        username = (connect_flags & 0b10000000 == 0)? "" : read_mqtt_string(io)
+        password = (connect_flags & 0b01000000 == 0)? "" : read_mqtt_string(io)
+
+        Connect.new(client_id, keep_alive, clean_session, username, password)
       when 2
-        puts "connack packet"
+        flags = io.read_byte.not_nil!
+        return_code = io.read_byte.not_nil!
+
+        Connack.new((flags & 0x01) == 1, return_code)
       when 3
         puts "publish packet"
+        topic = read_mqtt_string(io)
+        retain = (hflags & 0x01) == 1
+        qos = (hflags & 0x06)
+        dup = (hflags & 0x08) == 8
+        pkid = (qos == 0)? 0_u16 : io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+
+        payload_size = (qos == 0)? remaining_len - 2 - topic.bytesize : remaining_len - 2 - topic.bytesize - 2
+        payload = Bytes.new(payload_size)
+        io.read_fully(payload)
+
+        qos = case qos
+              when 0
+                QoS::AtmostOnce
+              when 1
+                QoS::AtleastOnce
+              when 2
+                QoS::ExactlyOnce
+              else
+                raise Exception.new("Invalid QoS value")
+              end
+
+        Publish.new(topic, qos, payload, Pkid.new(pkid))
       when 4
         puts "puback packet"
+        pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+        
+        Puback.new(Pkid.new(pkid))
       when 5
         puts "pubrec packet"
+        pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+        
+        Pubrec.new(Pkid.new(pkid))
       when 6
         puts "pubrel packet"
+        pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+        
+        Pubrel.new(Pkid.new(pkid))
       when 7
         puts "pubcomp packet"
+        pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+        
+        Pubcomp.new(Pkid.new(pkid))
       when 8
         puts "subscribe packet"
       when 9
@@ -528,5 +586,4 @@ struct Mqtt
         puts "disconnect packet"
       end
     end
-  end
 end
