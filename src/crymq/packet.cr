@@ -416,11 +416,22 @@ struct Suback
 end
 
 struct Unsubscribe
-    @topic: String
+    @topics: Array(String)
     @pkid: Pkid
 
-    def initialize(@topic)
-        @pkid = Pkid.new(0_u16)
+    def initialize(@topics, @pkid)
+    end
+
+    def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
+      remaining_len = 2 + @topics.map { |s| s[0].size + 2 }.sum
+      io.write_byte(0xA2_u8)
+      io.write_byte(remaining_len.to_u8)
+      io.write_byte((@pkid.value >> 8).to_u8)
+      io.write_byte(@pkid.value.to_u8)
+
+      @topics.each do |s|
+        write_mqtt_string(io, s)
+      end
     end
 end
 
@@ -572,18 +583,58 @@ struct Mqtt
         Pubcomp.new(Pkid.new(pkid))
       when 8
         puts "subscribe packet"
+        pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+        topics = [] of {String, QoS}
+
+        remaining_bytes = remaining_len - 2
+        while remaining_bytes > 0
+          topic = read_mqtt_string(io)
+          qos = io.read_byte.not_nil!
+          remaining_bytes -= topic.bytesize  + 3
+          topics.push({topic, QoS.from_value(qos)})
+        end
+
+        Subscribe.new(topics, Pkid.new(pkid))
       when 9
         puts "suback packet"
+        pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+        return_codes = [] of UInt8
+
+        remaining_bytes = remaining_len - 2
+        while remaining_bytes > 0
+          return_code = io.read_byte.not_nil!
+          remaining_bytes -= 1
+          return_codes.push(return_code)
+        end
+        Suback.new(Pkid.new(pkid), return_codes)
       when 10
         puts "unsubscribe packet"
+
+        pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+        topics = [] of String
+
+        remaining_bytes = remaining_len - 2
+        while remaining_bytes > 0
+          topic = read_mqtt_string(io)
+          remaining_bytes -= topic.bytesize  + 2
+          topics.push(topic)
+        end
+
+        Unsubscribe.new(topics, Pkid.new(pkid))
       when 11
         puts "unsuback packet"
+        pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
+        
+        Unsuback.new(Pkid.new(pkid))
       when 12
         puts "pingreq packet"
+        Pingreq.new
       when 13
         puts "pingresp packet"
+        Pingresp.new
       when 14
         puts "disconnect packet"
+        Disconnect.new
       end
     end
 end
