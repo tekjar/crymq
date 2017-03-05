@@ -1,7 +1,7 @@
 require "./spec_helper"
 
 describe Crymq do
-  it "connect packet write works" do
+  it "checks connect packet encoding and decoding" do
     socket = IO::Memory.new
     connect = Connect.new("hello", 10_u16)
     socket.write_bytes(connect, IO::ByteFormat::NetworkEndian)
@@ -14,7 +14,7 @@ describe Crymq do
     c.class.should eq(Connect)
     c.should eq(connect)
   end
-  it "connack packet write works" do
+  it "checks connack packet encoding and decoding" do
     socket = IO::Memory.new
     connack = Connack.new(true, 0_u8)
     socket.write_bytes(connack, IO::ByteFormat::NetworkEndian)
@@ -29,7 +29,7 @@ describe Crymq do
     #TODO: Fix this
     ca.should eq(connack)
   end
-  it "publish packet write works" do
+  it "checks publish packet encoding and decodings" do
     socket = IO::Memory.new
     publish = Publish.new("hello/world", QoS::AtleastOnce, "hello world".to_slice, Pkid.new(100_u16))
     socket.write_bytes(publish, IO::ByteFormat::NetworkEndian)
@@ -40,7 +40,7 @@ describe Crymq do
     pub.class.should eq(Publish)
     pub.should eq(publish)
   end
-  it "puback packet write works" do
+  it "checks puback packet encoding and decoding" do
     socket = IO::Memory.new
     puback = Puback.new(Pkid.new(1000_u16))
     socket.write_bytes(puback, IO::ByteFormat::NetworkEndian)
@@ -51,7 +51,7 @@ describe Crymq do
     puba.class.should eq(Puback)
     puba.should eq(puback)
   end
-  it "subscribe packet write works" do
+  it "checks subscribe packet encoding and decoding" do
     socket = IO::Memory.new
     subscribe = Subscribe.new([{"hello/world", QoS::AtleastOnce}, {"hello/crystal", QoS::ExactlyOnce}], Pkid.new(100_u16))
     socket.write_bytes(subscribe, IO::ByteFormat::NetworkEndian)
@@ -62,7 +62,7 @@ describe Crymq do
     sub.class.should eq(Subscribe)
     sub.should eq(subscribe)
   end
-  it "suback packet write works" do
+  it "checks suback packet encoding and decoding" do
     socket = IO::Memory.new
     suback = Suback.new(Pkid.new(100_u16), [1_u8, 2_u8, 3_u8, 128_u8])
     socket.write_bytes(suback, IO::ByteFormat::NetworkEndian)

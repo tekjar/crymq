@@ -3,10 +3,26 @@ require "./mqtt"
 PROTO_NAME  = {0x00_u8, 0x04_u8, 0x4D_u8, 0x51_u8, 0x54_u8, 0x54_u8} #04MQTT
 PROTO_LEVEL = 4_u8
 
+class CryMqError < Exception
+end
+
 enum QoS: UInt8
     AtmostOnce = 0
     AtleastOnce
     ExactlyOnce
+
+    def from_num(num : UInt8)
+      case num
+      when 0
+        AtmostOnce
+      when 1
+        AtleastOnce
+      when 2
+        ExactlyOnce
+      else
+        raise CryMqError.new("Invalid QoS. QoS can only be 0, 1 or 2")
+      end
+    end
 end
 
 struct Pkid
@@ -26,9 +42,6 @@ struct Pkid
     def next
         @pkid += 1
     end
-end
-
-class CryMqError < Exception
 end
 
 ## Fixed header for CONNECT PACKET
@@ -494,6 +507,7 @@ struct Mqtt
   def initialize
   end
 
+  # TODO: Raise exeception for malformed remaining length
   def self.read_remaining_length(io : IO)
       remaining_length = 0_u32
       multiplier = 0_u32
@@ -521,10 +535,27 @@ struct Mqtt
       
       pkt_type = header >> 4
       hflags = header & 0x0F
+      
+      if remaining_len == 0
+        case pkt_type
+        when 12
+          puts "pingreq packet"
+          Pingreq.new
+        when 13
+          puts "pingresp packet"
+          Pingresp.new
+        when 14
+          puts "disconnect packet"
+          Disconnect.new
+        else
+          raise CryMqError.new("Received packet should have payload")
+        end
+      end
+
       #TODO: Replace `not_nil` with custom exception
       #TODO: Split to smaller methods
       case pkt_type
-      when 1
+      when 1 # Connect packet
         protocol = read_mqtt_string(io)    
         level = io.read_byte.not_nil!      
         connect_flags = io.read_byte.not_nil!
@@ -535,12 +566,15 @@ struct Mqtt
         password = (connect_flags & 0b01000000 == 0)? "" : read_mqtt_string(io)
 
         Connect.new(client_id, keep_alive, clean_session, username, password)
-      when 2
+      when 2 # Connack packet
+        if remaining_len != 2
+          raise CryMqError.new("Incorrect payload size")
+        end
         flags = io.read_byte.not_nil!
         return_code = io.read_byte.not_nil!
 
         Connack.new((flags & 0x01) == 1, return_code)
-      when 3
+      when 3 # Publish packet
         topic = read_mqtt_string(io)
         retain = (hflags & 0x01) == 1
         qos = (hflags & 0x06) >> 1
@@ -563,28 +597,35 @@ struct Mqtt
               end
 
         Publish.new(topic, qos, payload, Pkid.new(pkid))
-      when 4
-        puts "puback packet"
+      when 4 # Puback packet
+        if remaining_len != 2
+          raise CryMqError.new("Incorrect payload size")
+        end
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         
         Puback.new(Pkid.new(pkid))
-      when 5
-        puts "pubrec packet"
+      when 5 # Pubrec packet
+        if remaining_len != 2
+          raise CryMqError.new("Incorrect payload size")
+        end
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         
         Pubrec.new(Pkid.new(pkid))
-      when 6
-        puts "pubrel packet"
+      when 6 # Pubrel packet
+        if remaining_len != 2
+          raise CryMqError.new("Incorrect payload size")
+        end
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         
         Pubrel.new(Pkid.new(pkid))
-      when 7
-        puts "pubcomp packet"
+      when 7 # Pubcomp packet
+        if remaining_len != 2
+          raise CryMqError.new("Incorrect payload size")
+        end
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         
         Pubcomp.new(Pkid.new(pkid))
-      when 8
-        puts "subscribe packet"
+      when 8 # Subscribe packet
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         topics = [] of {String, QoS}
 
@@ -597,8 +638,7 @@ struct Mqtt
         end
 
         Subscribe.new(topics, Pkid.new(pkid))
-      when 9
-        puts "suback packet"
+      when 9 # Suback packet
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         return_codes = [] of UInt8
 
@@ -610,8 +650,6 @@ struct Mqtt
         end
         Suback.new(Pkid.new(pkid), return_codes)
       when 10
-        puts "unsubscribe packet"
-
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         topics = [] of String
 
@@ -624,21 +662,16 @@ struct Mqtt
 
         Unsubscribe.new(topics, Pkid.new(pkid))
       when 11
-        puts "unsuback packet"
+        if remaining_len != 2
+          raise CryMqError.new("Incorrect payload size")
+        end
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         
         Unsuback.new(Pkid.new(pkid))
-      when 12
-        puts "pingreq packet"
-        Pingreq.new
-      when 13
-        puts "pingresp packet"
-        Pingresp.new
-      when 14
-        puts "disconnect packet"
-        Disconnect.new
+      when 12, 13, 14
+        raise CryMqError.new("Incorrect packet format")
       else
-        raise CryMqError.new("Invalid Packet Received")
+        raise CryMqError.new("Unsupported packet received")
       end
     end
 end

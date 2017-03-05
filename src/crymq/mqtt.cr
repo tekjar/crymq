@@ -11,11 +11,21 @@
 ## +-----------------------------------------------------+
 ## ```
 
+MAX_PAYLOAD_SIZE = 268435455
+
+class CryMqControl < Exception
+end
+
 abstract struct Control
     def initialize
     end
 
     def write_remaining_length(io : IO, remaining_len)
+      
+      if remaining_len > MAX_PAYLOAD_SIZE
+        raise CryMqControl.new("Payload too big")
+      end
+
       loop do
         digit = (remaining_len % 128).to_u8
         remaining_len /= 128
