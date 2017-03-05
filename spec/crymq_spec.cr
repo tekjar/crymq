@@ -10,7 +10,9 @@ describe Crymq do
     # The cursor is still after the written data. There are no two cursors for
     # reading and writing, there's only one for both. Use #rewind before reading it back
     socket.rewind
-    socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    c = socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    c.class.should eq(Connect)
+    c.should eq(connect)
   end
   it "connack packet write works" do
     socket = IO::Memory.new
@@ -21,7 +23,11 @@ describe Crymq do
     # The cursor is still after the written data. There are no two cursors for
     # reading and writing, there's only one for both. Use #rewind before reading it back
     socket.rewind
-    socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    ca = socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    ca.class.should eq(Connack)
+    puts ca, connack
+    #TODO: Fix this
+    ca.should eq(connack)
   end
   it "publish packet write works" do
     socket = IO::Memory.new
@@ -30,7 +36,9 @@ describe Crymq do
     socket.to_slice.hexstring.should eq("321a000b68656c6c6f2f776f726c64006468656c6c6f20776f726c64")
 
     socket.rewind
-    socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    pub = socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    pub.class.should eq(Publish)
+    pub.should eq(publish)
   end
   it "puback packet write works" do
     socket = IO::Memory.new
@@ -39,7 +47,9 @@ describe Crymq do
     socket.to_slice.hexstring.should eq("400203e8")
 
     socket.rewind
-    socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    puba = socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    puba.class.should eq(Puback)
+    puba.should eq(puback)
   end
   it "subscribe packet write works" do
     socket = IO::Memory.new
@@ -48,7 +58,9 @@ describe Crymq do
     socket.to_slice.hexstring.should eq("82200064000b68656c6c6f2f776f726c6401000d68656c6c6f2f6372797374616c02")
 
     socket.rewind
-    socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    sub = socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    sub.class.should eq(Subscribe)
+    sub.should eq(subscribe)
   end
   it "suback packet write works" do
     socket = IO::Memory.new
@@ -57,6 +69,8 @@ describe Crymq do
     socket.to_slice.hexstring.should eq("9006006401020380")
 
     socket.rewind
-    socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    suba = socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    suba.class.should eq(Suback)
+    suba.should eq(suback)
   end
 end

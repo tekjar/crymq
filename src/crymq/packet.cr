@@ -28,6 +28,9 @@ struct Pkid
     end
 end
 
+class CryMqError < Exception
+end
+
 ## Fixed header for CONNECT PACKET
 ##
 ## 7                          3                          0
@@ -520,7 +523,7 @@ struct Mqtt
       hflags = header & 0x0F
       #TODO: Replace `not_nil` with custom exception
       #TODO: Split to smaller methods
-      case pkt_type >> 4
+      case pkt_type
       when 1
         protocol = read_mqtt_string(io)    
         level = io.read_byte.not_nil!      
@@ -538,17 +541,16 @@ struct Mqtt
 
         Connack.new((flags & 0x01) == 1, return_code)
       when 3
-        puts "publish packet"
         topic = read_mqtt_string(io)
         retain = (hflags & 0x01) == 1
-        qos = (hflags & 0x06)
+        qos = (hflags & 0x06) >> 1
         dup = (hflags & 0x08) == 8
         pkid = (qos == 0)? 0_u16 : io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
 
         payload_size = (qos == 0)? remaining_len - 2 - topic.bytesize : remaining_len - 2 - topic.bytesize - 2
         payload = Bytes.new(payload_size)
         io.read_fully(payload)
-
+        
         qos = case qos
               when 0
                 QoS::AtmostOnce
@@ -557,7 +559,7 @@ struct Mqtt
               when 2
                 QoS::ExactlyOnce
               else
-                raise Exception.new("Invalid QoS value")
+                raise CryMqError.new("Invalid QoS value")
               end
 
         Publish.new(topic, qos, payload, Pkid.new(pkid))
@@ -635,6 +637,8 @@ struct Mqtt
       when 14
         puts "disconnect packet"
         Disconnect.new
+      else
+        raise CryMqError.new("Invalid Packet Received")
       end
     end
 end
