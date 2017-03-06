@@ -20,7 +20,6 @@ abstract struct Control
     end
 
     def write_remaining_length(io : IO, remaining_len)
-      
       if remaining_len > MAX_PAYLOAD_SIZE
         raise CryMqError.new("Payload too big")
       end

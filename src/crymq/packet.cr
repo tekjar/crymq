@@ -1,5 +1,6 @@
 require "./except"
 require "./mqtt"
+require "./topic"
 
 PROTO_NAME  = {0x00_u8, 0x04_u8, 0x4D_u8, 0x51_u8, 0x54_u8, 0x54_u8} #04MQTT
 PROTO_LEVEL = 4_u8
@@ -226,6 +227,7 @@ struct Publish < Control
     @payload: Bytes
 
     def initialize(@topic, @qos, @payload, @pkid, @retain = false, @dup = false)
+      Topic.validate(@topic)
     end
 
     def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
@@ -353,6 +355,9 @@ struct Subscribe < Control
     @pkid: Pkid
 
     def initialize(@topics, @pkid)
+      @topics.each do |topic, qos|
+        Topic.validate(topic)
+      end
     end
 
     def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
@@ -488,11 +493,7 @@ struct Disconnect
     end
 end
 
-# connack = Connack.new
-# puts connack
 
-# publish = Publish.new("a/b/c", QoS::AtleastOnce, "hello world".to_slice)
-# puts publish
 
 enum Packet : UInt8
   Connect = 1
