@@ -1,6 +1,6 @@
 # crymq
 
-TODO: Write a description here
+Pure crystal mqtt protocol
 
 ## Installation
 
@@ -9,7 +9,7 @@ Add this to your application's `shard.yml`:
 ```yaml
 dependencies:
   crymq:
-    github: [your-github-name]/crymq
+    github: tekjar/crymq
 ```
 
 ## Usage
@@ -26,7 +26,7 @@ TODO: Write development instructions here
 
 ## Contributing
 
-1. Fork it ( https://github.com/[your-github-name]/crymq/fork )
+1. Fork it ( https://github.com/tekjar/crymq/fork )
 2. Create your feature branch (git checkout -b my-new-feature)
 3. Commit your changes (git commit -am 'Add some feature')
 4. Push to the branch (git push origin my-new-feature)
@@ -34,4 +34,4 @@ TODO: Write development instructions here
 
 ## Contributors
 
-- [[your-github-name]](https://github.com/[your-github-name])  - creator, maintainer
+- [tekjar](https://github.com/tekjar)  - creator, maintainer

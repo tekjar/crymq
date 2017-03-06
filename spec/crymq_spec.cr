@@ -105,4 +105,13 @@ describe Crymq do
       socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
     end
   end
+  it "check for invalis publish and subscribe topic" do
+    expect_raises(TopicError, "Invalid topic") do
+      Publish.new("", QoS::AtleastOnce, "hello world".to_slice, Pkid.new(100_u16))
+    end
+
+    expect_raises(TopicError, "Invalid topic") do
+      Subscribe.new([{"", QoS::AtleastOnce}, {"hello/crystal", QoS::ExactlyOnce}], Pkid.new(100_u16))
+    end
+  end
 end
