@@ -1,3 +1,5 @@
+require "./except"
+
 ## Fixed header for each MQTT control packet
 ##
 ## Format:
@@ -13,9 +15,6 @@
 
 MAX_PAYLOAD_SIZE = 268435455
 
-class CryMqControl < Exception
-end
-
 abstract struct Control
     def initialize
     end
@@ -23,7 +22,7 @@ abstract struct Control
     def write_remaining_length(io : IO, remaining_len)
       
       if remaining_len > MAX_PAYLOAD_SIZE
-        raise CryMqControl.new("Payload too big")
+        raise CryMqError.new("Payload too big")
       end
 
       loop do

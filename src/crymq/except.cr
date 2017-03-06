@@ -1,0 +1,2 @@
+class CryMqError < Exception
+end

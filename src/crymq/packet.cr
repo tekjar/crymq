@@ -1,25 +1,18 @@
+require "./except"
 require "./mqtt"
 
 PROTO_NAME  = {0x00_u8, 0x04_u8, 0x4D_u8, 0x51_u8, 0x54_u8, 0x54_u8} #04MQTT
 PROTO_LEVEL = 4_u8
-
-class CryMqError < Exception
-end
 
 enum QoS: UInt8
     AtmostOnce = 0
     AtleastOnce
     ExactlyOnce
 
-    def from_num(num : UInt8)
-      case num
-      when 0
-        AtmostOnce
-      when 1
-        AtleastOnce
-      when 2
-        ExactlyOnce
-      else
+    def self.from_num(num : UInt8)
+      begin
+        self.from_value(num)
+      rescue
         raise CryMqError.new("Invalid QoS. QoS can only be 0, 1 or 2")
       end
     end
@@ -501,7 +494,30 @@ end
 # publish = Publish.new("a/b/c", QoS::AtleastOnce, "hello world".to_slice)
 # puts publish
 
-alias Packet = Connect | Connack | Publish | Puback | Pubrec | Pubrel | Pubcomp | Suback | Suback | Unsubscribe | Unsuback
+enum Packet : UInt8
+  Connect = 1
+  Connack
+  Publish
+  Puback
+  Pubrec
+  Pubrel
+  Pubcomp
+  Subscribe
+  Suback
+  Unsubscribe
+  Unsuback
+  Pingreq
+  Pingresp
+  Disconnect
+
+  def self.from_num(num : UInt8)
+    begin
+      self.from_value(num)
+    rescue
+      raise CryMqError.new("Unsupported packet received")
+    end
+  end
+end
 
 struct Mqtt
   def initialize
@@ -532,30 +548,26 @@ struct Mqtt
   def self.from_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
       header = io.read_byte.not_nil!
       remaining_len = read_remaining_length(io)
-      
-      pkt_type = header >> 4
+      pkt_type = Packet.from_num(header >> 4)
       hflags = header & 0x0F
       
       if remaining_len == 0
         case pkt_type
-        when 12
-          puts "pingreq packet"
+        when Packet::Pingreq
           Pingreq.new
-        when 13
-          puts "pingresp packet"
+        when Packet::Pingresp
           Pingresp.new
-        when 14
-          puts "disconnect packet"
+        when Packet::Disconnect
           Disconnect.new
         else
-          raise CryMqError.new("Received packet should have payload")
+          raise CryMqError.new("Invalid packet received")
         end
       end
 
       #TODO: Replace `not_nil` with custom exception
       #TODO: Split to smaller methods
-      case pkt_type
-      when 1 # Connect packet
+      case pkt_type   
+      when Packet::Connect
         protocol = read_mqtt_string(io)    
         level = io.read_byte.not_nil!      
         connect_flags = io.read_byte.not_nil!
@@ -566,7 +578,8 @@ struct Mqtt
         password = (connect_flags & 0b01000000 == 0)? "" : read_mqtt_string(io)
 
         Connect.new(client_id, keep_alive, clean_session, username, password)
-      when 2 # Connack packet
+      
+      when Packet::Connack
         if remaining_len != 2
           raise CryMqError.new("Incorrect payload size")
         end
@@ -574,7 +587,8 @@ struct Mqtt
         return_code = io.read_byte.not_nil!
 
         Connack.new((flags & 0x01) == 1, return_code)
-      when 3 # Publish packet
+     
+      when Packet::Publish
         topic = read_mqtt_string(io)
         retain = (hflags & 0x01) == 1
         qos = (hflags & 0x06) >> 1
@@ -585,47 +599,43 @@ struct Mqtt
         payload = Bytes.new(payload_size)
         io.read_fully(payload)
         
-        qos = case qos
-              when 0
-                QoS::AtmostOnce
-              when 1
-                QoS::AtleastOnce
-              when 2
-                QoS::ExactlyOnce
-              else
-                raise CryMqError.new("Invalid QoS value")
-              end
+        qos = QoS.from_num(qos)
 
         Publish.new(topic, qos, payload, Pkid.new(pkid))
-      when 4 # Puback packet
+      
+      when Packet::Puback
         if remaining_len != 2
           raise CryMqError.new("Incorrect payload size")
         end
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         
         Puback.new(Pkid.new(pkid))
-      when 5 # Pubrec packet
+      
+      when Packet::Pubrec
         if remaining_len != 2
           raise CryMqError.new("Incorrect payload size")
         end
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         
         Pubrec.new(Pkid.new(pkid))
-      when 6 # Pubrel packet
+      
+      when Packet::Pubrel
         if remaining_len != 2
           raise CryMqError.new("Incorrect payload size")
         end
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         
         Pubrel.new(Pkid.new(pkid))
-      when 7 # Pubcomp packet
+      
+      when Packet::Pubcomp
         if remaining_len != 2
           raise CryMqError.new("Incorrect payload size")
         end
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         
         Pubcomp.new(Pkid.new(pkid))
-      when 8 # Subscribe packet
+      
+      when Packet::Subscribe
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         topics = [] of {String, QoS}
 
@@ -638,7 +648,8 @@ struct Mqtt
         end
 
         Subscribe.new(topics, Pkid.new(pkid))
-      when 9 # Suback packet
+      
+      when Packet::Suback
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         return_codes = [] of UInt8
 
@@ -649,7 +660,8 @@ struct Mqtt
           return_codes.push(return_code)
         end
         Suback.new(Pkid.new(pkid), return_codes)
-      when 10
+      
+      when Packet::Unsubscribe
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         topics = [] of String
 
@@ -661,17 +673,17 @@ struct Mqtt
         end
 
         Unsubscribe.new(topics, Pkid.new(pkid))
-      when 11
+      
+      when Packet::Unsuback
         if remaining_len != 2
           raise CryMqError.new("Incorrect payload size")
         end
         pkid = io.read_bytes(UInt16, IO::ByteFormat::BigEndian)
         
         Unsuback.new(Pkid.new(pkid))
-      when 12, 13, 14
+      
+      when Packet::Pingreq, Packet::Pingresp, Packet::Disconnect
         raise CryMqError.new("Incorrect packet format")
-      else
-        raise CryMqError.new("Unsupported packet received")
       end
     end
 end

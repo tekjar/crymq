@@ -73,4 +73,36 @@ describe Crymq do
     suba.class.should eq(Suback)
     suba.should eq(suback)
   end
+  it "check invalid qos" do
+    expect_raises(CryMqError, "Invalid QoS. QoS can only be 0, 1 or 2") do
+      QoS.from_num(10_u8)
+    end
+  end
+  it "check publish packet contains payload" do
+    socket = IO::Memory.new
+    socket.write_bytes(0x32000000, IO::ByteFormat::BigEndian)
+    socket.rewind
+    
+    expect_raises(CryMqError, "Invalid packet received") do
+      socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    end
+  end
+  it "recognize unsupported packets" do
+    socket = IO::Memory.new
+    socket.write_bytes(0xF2000000, IO::ByteFormat::BigEndian)
+    socket.rewind
+    
+    expect_raises(CryMqError, "Unsupported packet received") do
+      socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    end
+  end
+  it "check invalid payload size in puback packet" do
+    socket = IO::Memory.new
+    socket.write_bytes(0x43111111, IO::ByteFormat::BigEndian)
+    socket.rewind
+    
+    expect_raises(CryMqError, "Incorrect payload size") do
+      socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    end
+  end
 end
