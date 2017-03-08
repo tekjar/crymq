@@ -555,11 +555,11 @@ struct Mqtt
       if remaining_len == 0
         case pkt_type
         when Packet::Pingreq
-          Pingreq.new
+          return Pingreq.new
         when Packet::Pingresp
-          Pingresp.new
+          return Pingresp.new
         when Packet::Disconnect
-          Disconnect.new
+          return Disconnect.new
         else
           raise CryMqError.new("Invalid packet received")
         end

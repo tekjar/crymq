@@ -73,6 +73,39 @@ describe Crymq do
     suba.class.should eq(Suback)
     suba.should eq(suback)
   end
+  it "checks pingreq packet encoding and decoding" do
+    socket = IO::Memory.new
+    pingreq = Pingreq.new
+    socket.write_bytes(pingreq, IO::ByteFormat::NetworkEndian)
+    socket.to_slice.hexstring.should eq("c000")
+
+    socket.rewind
+    pingr = socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    pingr.class.should eq(Pingreq)
+    pingr.should eq(pingreq)
+  end
+  it "checks pingreq packet encoding and decoding" do
+    socket = IO::Memory.new
+    pingresp = Pingresp.new
+    socket.write_bytes(pingresp, IO::ByteFormat::NetworkEndian)
+    socket.to_slice.hexstring.should eq("d000")
+
+    socket.rewind
+    pingr = socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    pingr.class.should eq(Pingresp)
+    pingr.should eq(pingresp)
+  end
+  it "checks disconnect packet encoding and decoding" do
+    socket = IO::Memory.new
+    disconnect = Disconnect.new
+    socket.write_bytes(disconnect, IO::ByteFormat::NetworkEndian)
+    socket.to_slice.hexstring.should eq("e000")
+
+    socket.rewind
+    disc = socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
+    disc.class.should eq(Disconnect)
+    disc.should eq(disconnect)
+  end
   it "check invalid qos" do
     expect_raises(CryMqError, "Invalid QoS. QoS can only be 0, 1 or 2") do
       QoS.from_num(10_u8)
