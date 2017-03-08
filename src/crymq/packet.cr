@@ -685,6 +685,8 @@ struct Mqtt
       
       when Packet::Pingreq, Packet::Pingresp, Packet::Disconnect
         raise CryMqError.new("Incorrect packet format")
+      else
+          raise CryMqError.new("Invalid packet received")
       end
     end
 end
