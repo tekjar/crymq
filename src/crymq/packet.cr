@@ -30,11 +30,11 @@ struct Pkid
     end
 
     def reset
-        @pkid = 0
+        @pkid = 0_u16
     end
 
     def next
-        @pkid += 1
+        @pkid += 1_u16
     end
 end
 
