@@ -107,7 +107,7 @@ describe Crymq do
     disc.should eq(disconnect)
   end
   it "check invalid qos" do
-    expect_raises(CryMqError, "Invalid QoS. QoS can only be 0, 1 or 2") do
+    expect_raises(MqttError, "Invalid QoS. QoS can only be 0, 1 or 2") do
       QoS.from_num(10_u8)
     end
   end
@@ -116,7 +116,7 @@ describe Crymq do
     socket.write_bytes(0x32000000, IO::ByteFormat::BigEndian)
     socket.rewind
     
-    expect_raises(CryMqError, "Invalid packet received") do
+    expect_raises(MqttError, "Invalid packet received") do
       socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
     end
   end
@@ -125,7 +125,7 @@ describe Crymq do
     socket.write_bytes(0xF2000000, IO::ByteFormat::BigEndian)
     socket.rewind
     
-    expect_raises(CryMqError, "Unsupported packet received") do
+    expect_raises(MqttError, "Unsupported packet received") do
       socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
     end
   end
@@ -134,7 +134,7 @@ describe Crymq do
     socket.write_bytes(0x43111111, IO::ByteFormat::BigEndian)
     socket.rewind
     
-    expect_raises(CryMqError, "Incorrect payload size") do
+    expect_raises(MqttError, "Incorrect payload size") do
       socket.read_bytes(Mqtt, IO::ByteFormat::NetworkEndian)
     end
   end
