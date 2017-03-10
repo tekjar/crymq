@@ -262,12 +262,12 @@ end
 ## Application payload
 #
 struct Publish < Control
-    @qos: QoS
-    @dup: Bool
-    @retain: Bool
-    @topic: String
-    @pkid: Pkid
-    @payload: Bytes
+    @qos : QoS
+    @dup : Bool
+    @retain : Bool
+    @topic : String
+    property pkid : Pkid
+    @payload : Bytes
 
     def initialize(@topic, @qos, @payload, @pkid, @retain = false, @dup = false)
       Topic.validate(@topic)
@@ -313,7 +313,7 @@ end
 ## +-----------------------------------------------------+
 #
 struct Puback
-    @pkid: Pkid
+    property pkid : Pkid
 
     def initialize(@pkid)
     end
@@ -327,7 +327,7 @@ struct Puback
 end
 
 struct Pubrec
-    @pkid: Pkid
+    property pkid : Pkid
 
     def initialize(@pkid)
     end
@@ -341,7 +341,7 @@ struct Pubrec
 end
 
 struct Pubrel
-    @pkid: Pkid
+    property pkid : Pkid
 
     def initialize(@pkid)
     end
@@ -355,7 +355,7 @@ struct Pubrel
 end
 
 struct Pubcomp
-    @pkid: Pkid
+    property pkid : Pkid
 
     def initialize(@pkid)
     end
@@ -394,8 +394,8 @@ end
 ##     ... for all the topics
 ##
 struct Subscribe < Control
-    @topics: Array({String, QoS})
-    @pkid: Pkid
+    @topics : Array({String, QoS})
+    property pkid : Pkid
 
     def initialize(@topics, @pkid)
       @topics.each do |topic, qos|
@@ -452,7 +452,7 @@ end
 ## +-----------------------------------------------------+
 
 struct Suback
-    @pkid : Pkid
+    property pkid : Pkid
     @return_codes : Array(UInt8)
 
     def initialize(@pkid, @return_codes)
@@ -474,7 +474,7 @@ end
 
 struct Unsubscribe
     @topics: Array(String)
-    @pkid: Pkid
+    property pkid : Pkid
 
     def initialize(@topics, @pkid)
     end
@@ -493,7 +493,7 @@ struct Unsubscribe
 end
 
 struct Unsuback
-    @pkid: Pkid
+    property pkid : Pkid
 
     def initialize(@pkid)
     end
